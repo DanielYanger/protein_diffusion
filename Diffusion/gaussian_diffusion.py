@@ -428,5 +428,30 @@ class GaussianDiffusion1D(nn.Module):
         return prev_sample.type(sample.dtype), log_prob # type: ignore
     
     # based on https://github.com/kvablack/ddpo-pytorch/blob/main/ddpo_pytorch/diffusers_patch/pipeline_with_logprob.py
-    def pipeline_with_logprob(self):
-        pass
+    def pipeline_with_logprob(self,
+                              eta: float = 0.0,
+                              batch_size: int = 16):
+        
+        # TODO: Verify this produces the same result
+        inference_steps = self.sampling_timesteps
+        total_steps = self.num_timesteps
+        times = torch.linspace(-1, total_steps - 1, steps=inference_steps + 1)   # [-1, 0, 1, 2, ..., T-1] when sampling_timesteps == total_timesteps
+        times = list(reversed(times.int().tolist()))
+
+        shape = (batch_size, self.channels, self.seq_length)
+        latents = torch.randn(shape, device = self.betas.device) # type: ignore
+
+        all_latents = [latents]
+        all_log_probs = []
+
+        for timestep in tqdm(times, desc = "Sampling with Log Prob Loop Time Step"):
+            # No CFG because that's only for conditional distributions
+            latent_model_input = latents
+            model_output = self.model(latent_model_input, timestep)
+
+            latents, log_prob = self.ddim_step_log_prob(model_output, timestep, latents, eta) # type: ignore
+
+            all_latents.append(latents)
+            all_log_probs.append(log_prob)
+
+        return latents, all_latents, all_log_probs
