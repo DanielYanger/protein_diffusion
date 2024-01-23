@@ -432,11 +432,10 @@ class GaussianDiffusion1D(nn.Module):
                               eta: float = 0.0,
                               batch_size: int = 16):
         
-        # TODO: Verify this produces the same result
         inference_steps = self.sampling_timesteps
         total_steps = self.num_timesteps
         times = torch.linspace(-1, total_steps - 1, steps=inference_steps + 1)   # [-1, 0, 1, 2, ..., T-1] when sampling_timesteps == total_timesteps
-        times = list(reversed(times.int().tolist()))
+        times = list(reversed(times.int().tolist()))[:-1]
 
         shape = (batch_size, self.channels, self.seq_length)
         latents = torch.randn(shape, device = self.betas.device) # type: ignore
