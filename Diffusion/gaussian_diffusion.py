@@ -492,4 +492,4 @@ class GaussianDiffusion1D(nn.Module):
             all_latents.append(latents)
             all_log_probs.append(log_prob)
 
-        return latents, all_latents, all_log_probs
+        return latents, all_latents, all_log_probs, times
