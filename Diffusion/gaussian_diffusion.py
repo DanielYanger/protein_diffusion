@@ -1,6 +1,7 @@
 # From https://github.com/lucidrains/denoising-diffusion-pytorch/blob/main/denoising_diffusion_pytorch/denoising_diffusion_pytorch_1d.py
 
 import math
+import json
 from pathlib import Path
 from random import random
 from functools import partial
@@ -73,6 +74,17 @@ class GaussianDiffusion1D(nn.Module):
         auto_normalize = True
     ):
         super().__init__()
+
+        self.config = {
+            'seq_length': seq_length,
+            'timesteps': timesteps,
+            'sampling_timesteps': sampling_timesteps,
+            'objective': objective,
+            'beta_schedule': beta_schedule,
+            'ddim_sampling_eta': ddim_sampling_eta,
+            'auto_normalize': auto_normalize
+        }
+
         self.model = model
         self.channels = self.model.channels
         self.self_condition = self.model.self_condition
@@ -368,13 +380,40 @@ class GaussianDiffusion1D(nn.Module):
         return self.p_losses(img, t, *args, **kwargs)
     
     def save_model(self, file_path):
-        data = self.state_dict()
-        torch.save(data, str(file_path/ f'diffusion-model.pt'))
+        self.model.save_unet(file_path)
 
-    def load_model(self, file_path, device):
-        data = torch.load(str(file_path/ f'diffusion-model.pt'), map_location=device)
-        self.load_state_dict(data)
-    
+        checkpoint = {
+            'state_dict': self.state_dict(),
+            'config': self.config,
+        }
+
+        torch.save(checkpoint, str(file_path/ f'diffusion-model.pt'))
+
+
+
+    def load_diffusion(file_path, device):
+
+        unet = Unet1D.load_unet(file_path)
+        
+        checkpoint = torch.load(str(file_path/ f'diffusion-model.pt'), map_location=device)
+        config = checkpoint['config']
+
+        diffusion = GaussianDiffusion1D(
+            unet,
+            config.seq_length,
+            config.time_steps,
+            config.sampling_timesteps,
+            config.objective,
+            config.beta_schedule,
+            config.ddim_sampling_eta,
+            config.auto_normalize
+        )
+
+        diffusion.load_state_dict(checkpoint['state_dict'])
+
+        return diffusion
+
+
     # based on https://github.com/kvablack/ddpo-pytorch/blob/main/ddpo_pytorch/diffusers_patch/ddim_with_logprob.py#L39 
     def ddim_step_log_prob(self, 
                            model_output: torch.FloatTensor, 
@@ -434,7 +473,7 @@ class GaussianDiffusion1D(nn.Module):
         
         inference_steps = self.sampling_timesteps
         total_steps = self.num_timesteps
-        times = torch.linspace(-1, total_steps - 1, steps=inference_steps + 1)   # [-1, 0, 1, 2, ..., T-1] when sampling_timesteps == total_timesteps
+        times = torch.linspace(-1, total_steps - 1, steps=inference_steps + 1)  
         times = list(reversed(times.int().tolist()))[:-1]
 
         shape = (batch_size, self.channels, self.seq_length)

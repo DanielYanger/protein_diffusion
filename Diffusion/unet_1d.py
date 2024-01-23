@@ -27,6 +27,23 @@ class Unet1D(nn.Module):
     ):
         super().__init__()
 
+        self.config = {
+            'dim': dim,
+            'init_dim': init_dim,
+            'out_dim': out_dim,
+            'dim_mults': dim_mults,
+            'channels': channels,
+            'self_condition': self_condition,
+            'resnet_block_groups': resnet_block_groups,
+            'learned_variance': learned_variance,
+            'learned_sinusoidal_cond': learned_sinusoidal_cond,
+            'random_fourier_features': random_fourier_features,
+            'learned_sinusoidal_dim': learned_sinusoidal_dim,
+            'sinusoidal_pos_emb_theta': sinusoidal_pos_emb_theta,
+            'attn_dim_head': attn_dim_head,
+            'attn_heads': attn_heads
+        }
+
         # determine dimensions
 
         self.channels = channels
@@ -138,3 +155,34 @@ class Unet1D(nn.Module):
 
         x = self.final_res_block(x, t)
         return self.final_conv(x)
+    
+    def save_unet(self, file_path):
+        checkpoint = {
+            'state_dict': self.state_dict(),
+            'config': self.config,
+        }
+        torch.save(checkpoint, str(file_path/f'unet.pt'))
+
+    def load_unet(file_path):
+        checkpoint = torch.load(str(file_path/f'unet.pt'))
+        config = checkpoint['config']
+
+        unet = Unet1D(
+            config.dim,
+            config.init_dim,
+            config.out_dim,
+            config.dim_mults,
+            config.channels,
+            config.self_condition,
+            config.resnet_block_groups,
+            config.learned_variance,
+            config.learned_sinusoidal_cond,
+            config.random_fourier_features,
+            config.learned_sinusoidal_dim,
+            config.sinusoidal_pos_emb_theta,
+            config.attn_dim_head,
+            config.attn_heads
+        )
+
+        unet.load_state_dict(checkpoint['state_dict'])
+        return unet
