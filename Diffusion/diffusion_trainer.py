@@ -6,8 +6,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.optim import Adam
 
-from gaussian_diffusion import GaussianDiffusion1D
-from modules_1D import has_int_squareroot, cycle, exists, num_to_groups
+from Diffusion.gaussian_diffusion import GaussianDiffusion1D
+from Diffusion.modules_1D import has_int_squareroot, cycle, exists, num_to_groups
 
 from denoising_diffusion_pytorch.version import __version__
 
@@ -35,7 +35,8 @@ class Trainer1D(object):
         amp = False,
         mixed_precision_type = 'fp16',
         split_batches = True,
-        max_grad_norm = 1.
+        max_grad_norm = 1.,
+        save_training_data = False,
     ):
         super().__init__()
 
@@ -48,7 +49,7 @@ class Trainer1D(object):
 
         # model
 
-        self.model = diffusion_model
+        self.model = diffusion_model.double()
         self.channels = diffusion_model.channels
 
         # sampling and training hyperparameters
@@ -64,6 +65,8 @@ class Trainer1D(object):
         self.train_num_steps = train_num_steps
 
         # dataset and dataloader
+        if save_training_data:
+            torch.save(dataset, f'{results_folder}/training_data.pt')
 
         dl = DataLoader(dataset, batch_size = train_batch_size, shuffle = True, pin_memory = True, num_workers = cpu_count())
 
@@ -109,6 +112,8 @@ class Trainer1D(object):
         }
 
         torch.save(data, str(self.results_folder / f'model-{milestone}.pt'))
+
+        self.model.save(self.results_folder)
 
     def load(self, milestone):
         accelerator = self.accelerator

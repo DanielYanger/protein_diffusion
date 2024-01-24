@@ -25,8 +25,8 @@ from ema_pytorch import EMA
 from tqdm.auto import tqdm
 
 from denoising_diffusion_pytorch.version import __version__
-from unet_1d import Unet1D
-from modules_1D import default, normalize_to_neg_one_to_one, unnormalize_to_zero_to_one, identity
+from Diffusion.unet_1d import Unet1D
+from Diffusion.modules_1D import default, normalize_to_neg_one_to_one, unnormalize_to_zero_to_one, identity
 
 # constants
 
@@ -85,7 +85,7 @@ class GaussianDiffusion1D(nn.Module):
             'auto_normalize': auto_normalize
         }
 
-        self.model = model
+        self.model = model.double()
         self.channels = self.model.channels
         self.self_condition = self.model.self_condition
 
@@ -353,7 +353,7 @@ class GaussianDiffusion1D(nn.Module):
 
         # predict and take gradient step
 
-        model_out = self.model(x, t, x_self_cond)
+        model_out = self.model(x.double(), t.double(), x_self_cond)
 
         if self.objective == 'pred_noise':
             target = noise
@@ -387,7 +387,7 @@ class GaussianDiffusion1D(nn.Module):
             'config': self.config,
         }
 
-        torch.save(checkpoint, str(file_path/ f'diffusion-model.pt'))
+        torch.save(checkpoint, str(file_path + f'/diffusion-model.pt'))
 
 
 
@@ -395,18 +395,18 @@ class GaussianDiffusion1D(nn.Module):
 
         unet = Unet1D.load_unet(file_path)
         
-        checkpoint = torch.load(str(file_path/ f'diffusion-model.pt'), map_location=device)
+        checkpoint = torch.load(str(file_path+ f'/diffusion-model.pt'), map_location=device)
         config = checkpoint['config']
 
         diffusion = GaussianDiffusion1D(
             unet,
-            config.seq_length,
-            config.time_steps,
-            config.sampling_timesteps,
-            config.objective,
-            config.beta_schedule,
-            config.ddim_sampling_eta,
-            config.auto_normalize
+            seq_length=config["seq_length"],
+            timesteps=config["timesteps"],
+            sampling_timesteps=config["sampling_timesteps"],
+            objective=config["objective"],
+            beta_schedule=config["beta_schedule"],
+            ddim_sampling_eta=config["ddim_sampling_eta"],
+            auto_normalize=config["auto_normalize"]
         )
 
         diffusion.load_state_dict(checkpoint['state_dict'])

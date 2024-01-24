@@ -4,8 +4,8 @@ import torch
 from torch import nn
 from functools import partial
 
-import modules_1D
-from modules_1D import default
+import Diffusion.modules_1D as modules_1D
+from Diffusion.modules_1D import default
 
 class Unet1D(nn.Module):
     def __init__(
@@ -161,27 +161,27 @@ class Unet1D(nn.Module):
             'state_dict': self.state_dict(),
             'config': self.config,
         }
-        torch.save(checkpoint, str(file_path/f'unet.pt'))
+        torch.save(checkpoint, str(file_path+f'/unet.pt'))
 
     def load_unet(file_path):
-        checkpoint = torch.load(str(file_path/f'unet.pt'))
+        checkpoint = torch.load(str(file_path+f'/unet.pt'))
         config = checkpoint['config']
 
         unet = Unet1D(
-            config.dim,
-            config.init_dim,
-            config.out_dim,
-            config.dim_mults,
-            config.channels,
-            config.self_condition,
-            config.resnet_block_groups,
-            config.learned_variance,
-            config.learned_sinusoidal_cond,
-            config.random_fourier_features,
-            config.learned_sinusoidal_dim,
-            config.sinusoidal_pos_emb_theta,
-            config.attn_dim_head,
-            config.attn_heads
+            config["dim"],
+            config["init_dim"],
+            config["out_dim"],
+            config["dim_mults"],
+            config["channels"],
+            config["self_condition"],
+            config["resnet_block_groups"],
+            config["learned_variance"],
+            config["learned_sinusoidal_cond"],
+            config["random_fourier_features"],
+            config["learned_sinusoidal_dim"],
+            config["sinusoidal_pos_emb_theta"],
+            config["attn_dim_head"],
+            config["attn_heads"]
         )
 
         unet.load_state_dict(checkpoint['state_dict'])
