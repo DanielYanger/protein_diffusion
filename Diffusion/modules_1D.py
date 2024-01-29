@@ -1,6 +1,6 @@
 # From https://github.com/lucidrains/denoising-diffusion-pytorch/blob/main/denoising_diffusion_pytorch/denoising_diffusion_pytorch_1d.py
 import math
-
+import os
 
 import torch
 from torch import nn, einsum, Tensor
@@ -10,6 +10,10 @@ from torch.utils.data import Dataset
 from einops import rearrange
 
 # helpers functions
+
+def create_folder(folder_path):
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
 
 def exists(x):
     return x is not None

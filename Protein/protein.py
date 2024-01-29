@@ -60,7 +60,7 @@ class Protein:
         yield t.from_numpy(np.array(self.__generate_random_sequence()))
 
     def validate_sequence(self, seq):
-        seq = (seq.cpu().numpy().transpose()*4.0).trunc()
+        seq = np.trunc(seq.cpu().numpy().transpose()*4.0)
         mismatch = 0
         for codon, amino_acid, i in zip(seq, self.sequence, range(len(seq))):
             try:
@@ -73,7 +73,7 @@ class Protein:
     
     def verify(self, seq):
         count = []
-        seq = (seq.cpu().numpy()*4).trunc()
+        seq = np.trunc((seq.cpu().numpy()*4))
         for sequence in seq:
             sequence = sequence.transpose()
             internal_count = 0

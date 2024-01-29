@@ -1,20 +1,23 @@
 # From https://github.com/lucidrains/denoising-diffusion-pytorch/blob/main/denoising_diffusion_pytorch/denoising_diffusion_pytorch_1d.py
-from multiprocessing import cpu_count
+
 from pathlib import Path
+from multiprocessing import cpu_count
 
 import torch
-from torch.utils.data import Dataset, DataLoader
 from torch.optim import Adam
-
-from Diffusion.gaussian_diffusion import GaussianDiffusion1D
-from Diffusion.modules_1D import has_int_squareroot, cycle, exists, num_to_groups
-
-from denoising_diffusion_pytorch.version import __version__
+from torch.utils.data import DataLoader, Dataset
 
 from accelerate import Accelerator
-from ema_pytorch import EMA
+from diffusers.training_utils import EMAModel
 
 from tqdm.auto import tqdm
+
+from diffusers.schedulers import DDIMScheduler
+
+from Diffusion.gaussian_diffusion import GaussianDiffusion1D
+from Diffusion.modules_1D import *
+
+# trainer class
 
 class Trainer1D(object):
     def __init__(
@@ -49,7 +52,7 @@ class Trainer1D(object):
 
         # model
 
-        self.model = diffusion_model.double()
+        self.model = diffusion_model
         self.channels = diffusion_model.channels
 
         # sampling and training hyperparameters
@@ -66,8 +69,9 @@ class Trainer1D(object):
 
         # dataset and dataloader
         if save_training_data:
+            create_folder(results_folder)
             torch.save(dataset, f'{results_folder}/training_data.pt')
-
+            
         dl = DataLoader(dataset, batch_size = train_batch_size, shuffle = True, pin_memory = True, num_workers = cpu_count())
 
         dl = self.accelerator.prepare(dl)
@@ -80,11 +84,19 @@ class Trainer1D(object):
         # for logging results in a folder periodically
 
         if self.accelerator.is_main_process:
-            self.ema = EMA(diffusion_model, beta = ema_decay, update_every = ema_update_every)
+            self.ema = EMAModel(
+                diffusion_model.parameters(),
+                decay=ema_decay,
+                use_ema_warmup=True,
+                power=3/4,
+                model_cls=GaussianDiffusion1D,
+                model_config=diffusion_model.config
+            )
             self.ema.to(self.device)
 
         self.results_folder = Path(results_folder)
         self.results_folder.mkdir(exist_ok = True)
+        print(f"Path: {results_folder}")
 
         # step counter state
 
@@ -108,18 +120,17 @@ class Trainer1D(object):
             'opt': self.opt.state_dict(),
             'ema': self.ema.state_dict(),
             'scaler': self.accelerator.scaler.state_dict() if exists(self.accelerator.scaler) else None, # type: ignore
-            'version': __version__
         }
+        create_folder(str(self.results_folder / f'checkpoints'))
+        torch.save(data, str(self.results_folder / f'checkpoints' / f'model-{milestone}.pt'))
 
-        torch.save(data, str(self.results_folder / f'model-{milestone}.pt'))
-
-        self.model.save(self.results_folder)
+        self.model.save_model(self.results_folder)
 
     def load(self, milestone):
         accelerator = self.accelerator
         device = accelerator.device
 
-        data = torch.load(str(self.results_folder / f'model-{milestone}.pt'), map_location=device)
+        data = torch.load(str(self.results_folder/ f'checkpoints' / f'model-{milestone}.pt'), map_location=device)
 
         model = self.accelerator.unwrap_model(self.model)
         model.load_state_dict(data['model'])
@@ -165,21 +176,14 @@ class Trainer1D(object):
 
                 accelerator.wait_for_everyone()
 
+                if accelerator.sync_gradients:
+                    self.ema.step(self.model.parameters())
+
                 self.step += 1
                 if accelerator.is_main_process:
-                    self.ema.update()
 
                     if self.step != 0 and self.step % self.save_and_sample_every == 0:
-                        self.ema.ema_model.eval() # type: ignore
-
-                        with torch.no_grad():
-                            milestone = self.step // self.save_and_sample_every
-                            batches = num_to_groups(self.num_samples, self.batch_size)
-                            all_samples_list = list(map(lambda n: self.ema.ema_model.sample(batch_size=n), batches)) # type: ignore
-
-                        all_samples = torch.cat(all_samples_list, dim = 0)
-
-                        torch.save(all_samples, str(self.results_folder / f'sample-{milestone}.png'))
+                        milestone = self.step // self.save_and_sample_every
                         self.save(milestone)
 
                 pbar.update(1)

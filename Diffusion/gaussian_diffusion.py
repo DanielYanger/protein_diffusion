@@ -24,18 +24,12 @@ from ema_pytorch import EMA
 
 from tqdm.auto import tqdm
 
-from denoising_diffusion_pytorch.version import __version__
 from Diffusion.unet_1d import Unet1D
-from Diffusion.modules_1D import default, normalize_to_neg_one_to_one, unnormalize_to_zero_to_one, identity
+from Diffusion.modules_1D import default, normalize_to_neg_one_to_one, unnormalize_to_zero_to_one, identity, create_folder
 
 # constants
 
 ModelPrediction =  namedtuple('ModelPrediction', ['pred_noise', 'pred_x_start'])
-
-
-# model
-
-# gaussian diffusion trainer class
 
 def extract(a, t, x_shape):
     b, *_ = t.shape
@@ -60,20 +54,22 @@ def cosine_beta_schedule(timesteps, s = 0.008):
     betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
     return torch.clip(betas, 0, 0.999)
 
+
 class GaussianDiffusion1D(nn.Module):
     def __init__(
         self,
         model: Unet1D,
         *,
-        seq_length,
+        seq_length = 1000,
         timesteps = 1000,
-        sampling_timesteps: int = None, # type: ignore
+        sampling_timesteps = None,
         objective = 'pred_noise',
         beta_schedule = 'cosine',
         ddim_sampling_eta = 0.,
         auto_normalize = True
     ):
         super().__init__()
+
 
         self.config = {
             'seq_length': seq_length,
@@ -85,7 +81,7 @@ class GaussianDiffusion1D(nn.Module):
             'auto_normalize': auto_normalize
         }
 
-        self.model = model.double()
+        self.model = model
         self.channels = self.model.channels
         self.self_condition = self.model.self_condition
 
@@ -157,8 +153,6 @@ class GaussianDiffusion1D(nn.Module):
             loss_weight = snr
         elif objective == 'pred_v':
             loss_weight = snr / (snr + 1)
-        else:
-            raise Exception("Invalid type")
 
         register_buffer('loss_weight', loss_weight)
 
@@ -222,9 +216,6 @@ class GaussianDiffusion1D(nn.Module):
             x_start = self.predict_start_from_v(x, t, v)
             x_start = maybe_clip(x_start)
             pred_noise = self.predict_noise_from_start(x, t, x_start)
-        
-        else:
-            raise Exception("Invalid objective")
 
         return ModelPrediction(pred_noise, x_start)
 
@@ -251,7 +242,7 @@ class GaussianDiffusion1D(nn.Module):
     def p_sample_loop(self, shape):
         batch, device = shape[0], self.betas.device
 
-        img = torch.randn(shape, device=device) # type: ignore
+        img = torch.randn(shape, device=device)
 
         x_start = None
 
@@ -270,12 +261,12 @@ class GaussianDiffusion1D(nn.Module):
         times = list(reversed(times.int().tolist()))
         time_pairs = list(zip(times[:-1], times[1:])) # [(T-1, T-2), (T-2, T-3), ..., (1, 0), (0, -1)]
 
-        img = torch.randn(shape, device = device) # type: ignore
+        img = torch.randn(shape, device = device)
 
         x_start = None
 
-        for time, time_next in tqdm(time_pairs, desc = 'sampling loop time step'): # type: ignore
-            time_cond = torch.full((batch,), time, device=device, dtype=torch.long) # type: ignore
+        for time, time_next in tqdm(time_pairs, desc = 'sampling loop time step'):
+            time_cond = torch.full((batch,), time, device=device, dtype=torch.long)
             self_cond = x_start if self.self_condition else None
             pred_noise, x_start, *_ = self.model_predictions(img, time_cond, self_cond, clip_x_start = clip_denoised)
 
@@ -283,8 +274,8 @@ class GaussianDiffusion1D(nn.Module):
                 img = x_start
                 continue
 
-            alpha = self.alphas_cumprod[time] # type: ignore
-            alpha_next = self.alphas_cumprod[time_next] # type: ignore
+            alpha = self.alphas_cumprod[time]
+            alpha_next = self.alphas_cumprod[time_next]
 
             sigma = eta * ((1 - alpha / alpha_next) * (1 - alpha_next) / (1 - alpha)).sqrt()
             c = (1 - alpha_next - sigma ** 2).sqrt()
@@ -297,7 +288,7 @@ class GaussianDiffusion1D(nn.Module):
 
         img = self.unnormalize(img)
         return img
-
+ 
     @torch.no_grad()
     def sample(self, batch_size = 16):
         seq_length, channels = self.seq_length, self.channels
@@ -311,16 +302,16 @@ class GaussianDiffusion1D(nn.Module):
 
         assert x1.shape == x2.shape
 
-        t_batched = torch.full((b,), t, device = device) # type: ignore
+        t_batched = torch.full((b,), t, device = device)
         xt1, xt2 = map(lambda x: self.q_sample(x, t = t_batched), (x1, x2))
 
         img = (1 - lam) * xt1 + lam * xt2
 
         x_start = None
 
-        for i in tqdm(reversed(range(0, t)), desc = 'interpolation sample time step', total = t): # type: ignore
+        for i in tqdm(reversed(range(0, t)), desc = 'interpolation sample time step', total = t):
             self_cond = x_start if self.self_condition else None
-            img, x_start = self.p_sample(img, i, self_cond) # type: ignore
+            img, x_start = self.p_sample(img, i, self_cond)
 
         return img
 
@@ -352,8 +343,7 @@ class GaussianDiffusion1D(nn.Module):
                 x_self_cond.detach_()
 
         # predict and take gradient step
-
-        model_out = self.model(x.double(), t.double(), x_self_cond)
+        model_out = self.model(x, t, x_self_cond)
 
         if self.objective == 'pred_noise':
             target = noise
@@ -365,12 +355,12 @@ class GaussianDiffusion1D(nn.Module):
         else:
             raise ValueError(f'unknown objective {self.objective}')
 
-        loss = F.mse_loss(model_out, target, reduction = 'none') # type: ignore
+        loss = F.mse_loss(model_out, target, reduction = 'none')
         loss = reduce(loss, 'b ... -> b', 'mean')
 
         loss = loss * extract(self.loss_weight, t, loss.shape)
         return loss.mean()
-    
+
     def forward(self, img, *args, **kwargs):
         b, c, n, device, seq_length, = *img.shape, img.device, self.seq_length
         assert n == seq_length, f'seq length must be {seq_length}'
@@ -380,6 +370,7 @@ class GaussianDiffusion1D(nn.Module):
         return self.p_losses(img, t, *args, **kwargs)
     
     def save_model(self, file_path):
+        create_folder(file_path)
         self.model.save_unet(file_path)
 
         checkpoint = {
@@ -387,7 +378,7 @@ class GaussianDiffusion1D(nn.Module):
             'config': self.config,
         }
 
-        torch.save(checkpoint, str(file_path + f'/diffusion-model.pt'))
+        torch.save(checkpoint, str(f'{file_path}/diffusion-model.pt'))
 
 
 
@@ -395,7 +386,7 @@ class GaussianDiffusion1D(nn.Module):
 
         unet = Unet1D.load_unet(file_path)
         
-        checkpoint = torch.load(str(file_path+ f'/diffusion-model.pt'), map_location=device)
+        checkpoint = torch.load(str(f'{file_path}/diffusion-model.pt'), map_location=device)
         config = checkpoint['config']
 
         diffusion = GaussianDiffusion1D(
