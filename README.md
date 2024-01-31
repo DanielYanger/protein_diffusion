@@ -6,3 +6,9 @@ DDPO
 
 Protein
 * basic code for protein representation
+
+LGBM
+* Light GBM model for predicting TE of a sequence with fixed UTR
+
+TACC Scripts
+* Scripts for launching jobs on TACC
