@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH -J diffusion-%j                # job name
-#SBATCH -o diffusion-%j-output.o            # output and error file name (%j expands to SLURM jobID)
+#SBATCH -J working-diffusion-%j                # job name
+#SBATCH -o working-diffusion-%j-output.o            # output and error file name (%j expands to SLURM jobID)
 #SBATCH -N 1                        # number of nodes requested
 #SBATCH -n 4                        # total number of tasks to run in parallel
 #SBATCH -p gpu-a100-small              # queue (partition) 
