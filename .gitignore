@@ -4,3 +4,4 @@ __pycache__
 gaussian_diffusion_model*
 *-output.o
 envs
+longer_gd

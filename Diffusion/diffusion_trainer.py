@@ -66,12 +66,15 @@ class Trainer1D(object):
         self.max_grad_norm = max_grad_norm
 
         self.train_num_steps = train_num_steps
-
+        create_folder(results_folder)
+        create_folder(f'{results_folder}/checkpoints')
+        create_folder(f'{results_folder}/checkpoints/models')
+        create_folder(f'{results_folder}/checkpoints/samples')
+            
         # dataset and dataloader
         if save_training_data:
-            create_folder(results_folder)
             torch.save(dataset, f'{results_folder}/training_data.pt')
-            
+        
         dl = DataLoader(dataset, batch_size = train_batch_size, shuffle = True, pin_memory = True, num_workers = cpu_count())
 
         dl = self.accelerator.prepare(dl)
@@ -121,16 +124,18 @@ class Trainer1D(object):
             'ema': self.ema.state_dict(),
             'scaler': self.accelerator.scaler.state_dict() if exists(self.accelerator.scaler) else None, # type: ignore
         }
-        create_folder(str(self.results_folder / f'checkpoints'))
-        torch.save(data, str(self.results_folder / f'checkpoints' / f'model-{milestone}.pt'))
+        torch.save(data, str(self.results_folder / f'checkpoints' / f'models' / f'model-{milestone}.pt'))
 
         self.model.save_model(self.results_folder)
+        
+        samples = self.model.sample()
+        torch.save(samples, str(self.results_folder/ f'checkpoints'  / f'samples'  /f'sample-{milestone}.pt'))
 
     def load(self, milestone):
         accelerator = self.accelerator
         device = accelerator.device
 
-        data = torch.load(str(self.results_folder/ f'checkpoints' / f'model-{milestone}.pt'), map_location=device)
+        data = torch.load(str(self.results_folder/ f'checkpoints' / f'models' / f'model-{milestone}.pt'), map_location=device)
 
         model = self.accelerator.unwrap_model(self.model)
         model.load_state_dict(data['model'])
@@ -145,7 +150,7 @@ class Trainer1D(object):
 
         if exists(self.accelerator.scaler) and exists(data['scaler']):
             self.accelerator.scaler.load_state_dict(data['scaler']) # type: ignore
-
+            
     def train(self):
         accelerator = self.accelerator
         device = accelerator.device

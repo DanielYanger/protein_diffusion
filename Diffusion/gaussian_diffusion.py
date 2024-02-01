@@ -380,8 +380,6 @@ class GaussianDiffusion1D(nn.Module):
 
         torch.save(checkpoint, str(f'{file_path}/diffusion-model.pt'))
 
-
-
     def load_diffusion(file_path, device):
 
         unet = Unet1D.load_unet(file_path)
