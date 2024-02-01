@@ -1,6 +1,6 @@
 from collections import OrderedDict
 import numpy as np
-
+import pandas as pd
 
 CODON_TO_AMINO_ACID = {
     'TCA': 'S',    # Serine
@@ -291,4 +291,4 @@ def feature_list_from_seq(features_to_extract, seq, utr5_size, cds_size, utr3_si
         kmer_counts = get_k_mer_counts(seq, k, overlap, normalize)
         temp = temp + list(kmer_counts.values())
    
-    return temp
+    return pd.DataFrame(temp).transpose()

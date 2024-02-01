@@ -31,7 +31,7 @@ class LGBM_TE_model:
         full_sequence = self.utr5+cds+self.utr3
         extracted_features = feature_list_from_seq(self.features_to_extract, full_sequence, len(self.utr5), len(cds), len(self.utr3), len(full_sequence))
         value = 0.0
-        for model in tqdm(self.models.items()):
+        for _, model in tqdm(self.models.items()):
             value+= model.predict(extracted_features)
         
         value /= len(self.models)
@@ -40,8 +40,8 @@ class LGBM_TE_model:
 if __name__ == '__main__':
 
     model = LGBM_TE_model(
-        './lgbm-LL_P5_P3_CF_AAF_3mer_freq_5', # From https://github.com/CenikLab/TE_prediction_baseline/tree/main/results/human/all_cell_lines/lgbm-LL_P5_P3_CF_AAF_3mer_freq_5/
-        'utr3',
-        'utr5')
+        './LL_P5_P3_CF_AAF_3mer_freq_5', # From https://github.com/CenikLab/TE_prediction_baseline/tree/main/results/human/all_cell_lines/lgbm-LL_P5_P3_CF_AAF_3mer_freq_5/
+        'AAAAATTTGGCGATACTTTAC',
+        'AAAAATTTGGCGATACTTTAC')
     
-    data = model.predict_TE('sequence')
+    data = model.predict_TE('AAAAATTTGGCGATGGGTGTGTAACCCAAACTTTAC')
