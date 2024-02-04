@@ -291,4 +291,57 @@ def feature_list_from_seq(features_to_extract, seq, utr5_size, cds_size, utr3_si
         kmer_counts = get_k_mer_counts(seq, k, overlap, normalize)
         temp = temp + list(kmer_counts.values())
    
-    return pd.DataFrame(temp).transpose()
+    df = pd.DataFrame(temp).transpose()
+    df.columns = get_cols(features_to_extract)
+    return df
+
+def get_cols(features):
+    cols = []
+    if 'L' in features:
+        cols = cols + ['utr5_size', 'cds_size', 'utr3_size', 'tx_size']
+
+    if 'LL' in features:
+        cols = cols + ['utr5_log_size', 'cds_log_size', 'utr3_log_size', 'tx_log_size']
+
+    if 'P' in features:
+        cols = cols + ['A_percent', 'T_percent', 'G_percent', 'C_percent']
+    if 'P5' in features:
+        cols = cols + ['A_percent5', 'T_percent5', 'G_percent5', 'C_percent5']
+    if 'PC' in features:
+        cols = cols + ['A_percentC', 'T_percentC', 'G_percentC', 'C_percentC']
+    if 'P3' in features:
+        cols = cols + ['A_percent3', 'T_percent3', 'G_percent3', 'C_percent3']
+    if 'WP' in features:
+        cols = cols + ['A_wobble_percent', 'T_wobble_percent', 'G_wobble_percent', 'C_wobble_percent']
+
+    if 'C' in features:
+        codons = OrderedDict()
+        generate_empty_kmers(codons, ['A', 'T', 'G', 'C'], 3, "")
+        cols = cols + ["codon_count_" + key for key in codons.keys()]
+
+    if 'CF' in features:
+        codons = OrderedDict()
+        generate_empty_kmers(codons, ['A', 'T', 'G', 'C'], 3, "")
+        cols = cols + ["codon_freq_" + key for key in codons.keys()]
+
+    if 'DC' in features:
+        cols = cols + ["dicodon_count_" + dicodon for dicodon in dicodons_to_include]
+
+    kozak_positions = [-3, -2, -1, 4, 5]
+    if 'K' in features:
+        cols = cols + [f'kozak{kozak_position}_{base}' for kozak_position in kozak_positions for base in ['A', 'T', 'G', 'C']]
+
+    if 'AA' in features:
+        cols = cols + ['aa_count_' + amino_acid for amino_acid in AMINO_ACID_TO_CODON.keys()]
+    
+    if 'AAF' in features:
+        cols = cols + ['aa_freq_' + amino_acid for amino_acid in AMINO_ACID_TO_CODON.keys()]
+
+    kmers = [i for i in features if 'mer' in i]
+    for kmer in kmers:
+        k = int(kmer[0])
+        kmer_names = OrderedDict()
+        generate_empty_kmers(kmer_names, ['A', 'T', 'G', 'C'], k, "")
+        cols = cols + [kmer + "_" + key for key in kmer_names.keys()]
+
+    return cols

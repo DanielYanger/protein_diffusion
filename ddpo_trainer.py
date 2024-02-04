@@ -13,8 +13,10 @@ from ml_collections import config_flags
 from functools import partial
 from collections import defaultdict
 
-from ddpo_config import get_config
-from Diffusion.gaussian_diffusion import load_diffusion
+from DDPO.ddpo_config import get_config
+from Diffusion.gaussian_diffusion import GaussianDiffusion1D
+from Protein.protein import Protein
+
 
 FLAGS = flags.FLAGS
 config_flags.DEFINE_config_file("config", "ddpo_config.py", "Training configuration.")
@@ -56,7 +58,7 @@ def main():
 
     set_seed(config.seed, device_specific=True)
 
-    diffusion = load_diffusion(config.pretrained.model)
+    diffusion = GaussianDiffusion1D.load_diffusion(config.pretrained.model, accelerator.device)
 
     optimizer = torch.optim.AdamW(diffusion.parameters(),
                                 lr=config.train.learning_rate,
@@ -64,7 +66,10 @@ def main():
                                 weight_decay=config.train.adam_weight_decay,
                                 eps=config.train.adam_epsilon,)
     
-    reward_fn = config.reward_fn
+    protein_seq = config.sequence
+    protein_obj = Protein(protein_seq)
+
+    reward_fn = protein_obj.verify
     autocast = accelerator.autocast
 
     diffusion, optimizer = accelerator.prepare(diffusion, optimizer)
@@ -225,3 +230,6 @@ def main():
 
             if epoch != 0 and epoch % config.save_freq == 0 and accelerator.is_main_process:
                 accelerator.save_state()
+
+if __name__ == "__main__":
+    main()

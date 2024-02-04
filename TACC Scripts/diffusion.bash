@@ -1,11 +1,11 @@
 #!/bin/bash
 
-#SBATCH -J longer-diffusion-%j                # job name
-#SBATCH -o longer-diffusion-%j-output.o            # output and error file name (%j expands to SLURM jobID)
+#SBATCH -J 1000-step-diffusion-%j                # job name
+#SBATCH -o 1000-step-diffusion-%j-output.o            # output and error file name (%j expands to SLURM jobID)
 #SBATCH -N 1                        # number of nodes requested
 #SBATCH -n 4                        # total number of tasks to run in parallel
 #SBATCH -p gpu-a100-small              # queue (partition) 
-#SBATCH -t 28:00:00                 # run time (hh:mm:ss) 
+#SBATCH -t 24:00:00                 # run time (hh:mm:ss) 
 #SBATCH --mail-user=daniel_yanger@utexas.edu
 #SBATCH --mail-type=all
 

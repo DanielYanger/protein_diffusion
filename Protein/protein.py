@@ -3,14 +3,23 @@ import random
 import numpy as np
 import torch as t
 
+from LGBM.lgbm import LGBM_TE_model
+
 class Protein:
-    def __init__(self, sequence, codon_table = CodonTable.standard_dna_table):
+    def __init__(self, 
+                sequence: str, 
+                models_dir: str = '/work/09360/dayang/ls6/protein-generation/protein_diffusion/LGBM/LL_P5_P3_CF_AAF_3mer_freq_5',
+                codon_table = CodonTable.standard_dna_table):
+
+        
         self.sequence = sequence
         self.codon_table = codon_table
         self.__construct_color_mapping()
         self.__construct_inverse_table()
 
-    def __construct_color_mapping(self, A=0, U=1, C=2, G=3):
+        self.LGBM_model = LGBM_TE_model(models_dir)
+
+    def __construct_color_mapping(self, A=1, U=2, C=3, G=4):
         self.base_mapping = {
             'A': A,
             A: 'A',
@@ -60,7 +69,7 @@ class Protein:
         yield t.from_numpy(np.array(self.__generate_random_sequence()))
 
     def validate_sequence(self, seq):
-        seq = np.trunc(seq.cpu().numpy().transpose()*4.0)
+        seq = (seq.cpu().numpy().transpose()*4.0).round()
         mismatch = 0
         for codon, amino_acid, i in zip(seq, self.sequence, range(len(seq))):
             try:
@@ -73,7 +82,7 @@ class Protein:
     
     def verify(self, seq):
         count = []
-        seq = np.trunc((seq.cpu().numpy()*4))
+        seq = (seq.cpu().numpy()*4).round()
         for sequence in seq:
             sequence = sequence.transpose()
             internal_count = 0
@@ -93,4 +102,25 @@ class Protein:
         
         return t.Tensor(count)
 
+    def reward_TE_prediction(self, sequence):
+        seq = np.trunc(sequence.cpu().numpy().transpose()*4.0)
+        mismatch = 0
+        valid_seq = True
+        cds = ''
+        for codon, amino_acid, i in zip(seq, self.sequence, range(len(seq))):
+            try:
+                codon_str = self.base_mapping[codon[0]]+self.base_mapping[codon[1]]+self.base_mapping[codon[2]]
+                if not self.codon_table.forward_table[codon_str] == amino_acid:
+                    mismatch+=1
+                    valid_seq = False
+
+                if valid_seq:
+                    cds+=codon_str
+            except KeyError:
+                mismatch+=1
+                valid_seq = False
         
+        if mismatch!=0:
+            return -mismatch
+        
+        return self.LGBM_model.predict_TE(cds)

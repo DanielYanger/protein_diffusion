@@ -7,3 +7,6 @@ pytorch-fid
 torch
 torchvision
 tqdm
+lightgbm
+pandas
+scikit-learn

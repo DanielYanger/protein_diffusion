@@ -40,7 +40,7 @@ class LGBM_TE_model:
 if __name__ == '__main__':
 
     model = LGBM_TE_model(
-        './LL_P5_P3_CF_AAF_3mer_freq_5', # From https://github.com/CenikLab/TE_prediction_baseline/tree/main/results/human/all_cell_lines/lgbm-LL_P5_P3_CF_AAF_3mer_freq_5/
+        '/work/09360/dayang/ls6/protein-generation/protein_diffusion/LGBM/LL_P5_P3_CF_AAF_3mer_freq_5', # From https://github.com/CenikLab/TE_prediction_baseline/tree/main/results/human/all_cell_lines/lgbm-LL_P5_P3_CF_AAF_3mer_freq_5/
         'AAAAATTTGGCGATACTTTAC',
         'AAAAATTTGGCGATACTTTAC')
     
