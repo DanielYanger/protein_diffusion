@@ -1,7 +1,7 @@
 import pickle
 import pandas as pd
 import os
-from lgbm_feature_extract_from_str import feature_list_from_seq
+from LGBM.lgbm_feature_extract_from_str import feature_list_from_seq
 import yaml
 from tqdm import tqdm
 import numpy as np
