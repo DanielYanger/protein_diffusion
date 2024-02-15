@@ -123,5 +123,5 @@ class Protein:
                 except KeyError:
                     mismatch+=1
                     valid_seq = False
-            count.append((self.LGBM_model.predict_TE(cds)[0] if mismatch==0 else -mismatch)*self.SCALE_FACTOR)
+            count.append((self.LGBM_model.predict_TE(cds)[0] if valid_seq else -mismatch)*self.SCALE_FACTOR)
         return t.Tensor(count)

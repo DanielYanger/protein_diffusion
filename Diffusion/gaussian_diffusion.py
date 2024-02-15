@@ -406,7 +406,7 @@ class GaussianDiffusion1D(nn.Module):
     # based on https://github.com/kvablack/ddpo-pytorch/blob/main/ddpo_pytorch/diffusers_patch/ddim_with_logprob.py#L39 
     def ddim_step_log_prob(self, 
                            model_output: torch.FloatTensor, 
-                           timestep: int, 
+                           timestep, 
                            sample: torch.FloatTensor,
                            eta: float = 0.0,
                            use_clipped_model_output: bool = False,
@@ -473,10 +473,11 @@ class GaussianDiffusion1D(nn.Module):
 
         for timestep in tqdm(times, desc = "Sampling with Log Prob Loop Time Step"):
             # No CFG because that's only for conditional distributions
+            time = torch.full((batch,), timestep, device=device, dtype=torch.long)
             latent_model_input = latents
-            model_output = self.model(latent_model_input, timestep)
+            model_output = self.model(latent_model_input, time)
 
-            latents, log_prob = self.ddim_step_log_prob(model_output, timestep, latents, eta) # type: ignore
+            latents, log_prob = self.ddim_step_log_prob(model_output, time, latents, eta) # type: ignore
 
             all_latents.append(latents)
             all_log_probs.append(log_prob)
