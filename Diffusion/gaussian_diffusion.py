@@ -25,7 +25,7 @@ from ema_pytorch import EMA
 from tqdm.auto import tqdm
 
 from Diffusion.unet_1d import Unet1D
-from Diffusion.modules_1D import default, normalize_to_neg_one_to_one, unnormalize_to_zero_to_one, identity, create_folder
+from Diffusion.modules_1D import default, normalize_to_neg_one_to_one, unnormalize_to_zero_to_one, identity, create_folder, left_broadcast
 
 # constants
 
@@ -416,7 +416,10 @@ class GaussianDiffusion1D(nn.Module):
         maybe_clip = partial(torch.clamp, min = -1., max = 1.) if use_clipped_model_output else identity
         
         alpha = self.alphas_cumprod[timestep] # type: ignore
+        alpha = left_broadcast(alpha, sample.shape).to(sample.device)
+
         alpha_prev = self.alphas_cumprod[prev_timestep] # type: ignore
+        alpha_prev = left_broadcast(alpha_prev, sample.shape).to(sample.device)
 
         if self.objective == 'pred_noise':
             pred_noise = model_output
@@ -456,6 +459,7 @@ class GaussianDiffusion1D(nn.Module):
         return prev_sample.type(sample.dtype), log_prob # type: ignore
     
     # based on https://github.com/kvablack/ddpo-pytorch/blob/main/ddpo_pytorch/diffusers_patch/pipeline_with_logprob.py
+    @torch.no_grad()
     def pipeline_with_logprob(self,
                               eta: float = 0.0,
                               batch_size: int = 16):
@@ -463,7 +467,7 @@ class GaussianDiffusion1D(nn.Module):
         inference_steps = self.sampling_timesteps
         total_steps = self.num_timesteps
         times = torch.linspace(-1, total_steps - 1, steps=inference_steps + 1)  
-        times = list(reversed(times.int().tolist()))[:-1]
+        times = torch.tensor(list(reversed(times.int().tolist()))[:-1], device = self.betas.device)
 
         shape = (batch_size, self.channels, self.seq_length)
         latents = torch.randn(shape, device = self.betas.device) # type: ignore
@@ -473,7 +477,7 @@ class GaussianDiffusion1D(nn.Module):
 
         for timestep in tqdm(times, desc = "Sampling with Log Prob Loop Time Step"):
             # No CFG because that's only for conditional distributions
-            time = torch.full((batch,), timestep, device=device, dtype=torch.long)
+            time = torch.full((batch_size,), timestep, device=self.betas.device, dtype=torch.long)
             latent_model_input = latents
             model_output = self.model(latent_model_input, time)
 

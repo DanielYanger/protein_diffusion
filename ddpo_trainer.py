@@ -112,6 +112,7 @@ def main():
             
             latents = torch.stack(latents, dim=1)  # (batch_size, num_steps + 1, 4, 64, 64)
             log_probs = torch.stack(log_probs, dim=1) 
+            timesteps = timesteps.repeat(config.sample.batch_size, 1)  # (batch_size, num_steps)
 
             rewards = reward_fn(images)
 
@@ -125,111 +126,121 @@ def main():
                 }
             )
 
-            samples = {k: torch.cat([s[k] for s in samples]) for k in samples[0].keys()}
+        samples = {k: torch.cat([s[k] for s in samples]) for k in samples[0].keys()}
 
-            rewards = accelerator.gather(samples["rewards"]).cpu().numpy()
-            accelerator.log(
-                        {
-                            "reward": rewards,
-                            "epoch": epoch,
-                            "reward_mean": rewards.mean(),
-                            "reward_std": rewards.std(),
-                        },
-                        step=global_step,
-            )
+        rewards = accelerator.gather(samples["rewards"]).cpu().numpy()
+        accelerator.log(
+                    {
+                        "reward": rewards,
+                        "epoch": epoch,
+                        "reward_mean": rewards.mean(),
+                        "reward_std": rewards.std(),
+                    },
+                    step=global_step,
+        )
 
-            advantages = (rewards - rewards.mean()) / (rewards.std() + 1e-8)
+        advantages = (rewards - rewards.mean()) / (rewards.std() + 1e-8)
+        
+        
+        accelerator.log(
+            {"epoch": epoch, "reward": rewards, "advantages": advantages, "reward_mean": rewards.mean(), "reward_std": rewards.std()},
+            step=global_step,
+        )
 
-            samples["advantages"] = torch.as_tensor(advantages).reshape(accelerator.num_processes, -1)[accelerator.process_index].to(accelerator.device)
+        print(f"epoch: {epoch}, reward: {rewards}, advantages: {advantages}, reward_mean: {rewards.mean()}, reward_std: {rewards.std()}")
+        
 
-            del samples["rewards"]
+        samples["advantages"] = torch.as_tensor(advantages).reshape(accelerator.num_processes, -1)[accelerator.process_index].to(accelerator.device)
 
-            total_batch_size, num_timesteps = samples["timesteps"].shape
-            assert (total_batch_size == config.sample.batch_size * config.sample.num_batches_per_epoch)
-            assert num_timesteps == config.sample.num_steps
+        del samples["rewards"]
 
-            for inner_epoch in range(config.train.num_inner_epochs):
-                perm = torch.randperm(total_batch_size, device=accelerator.device)
-                samples = {k: v[perm] for k, v in samples.items()}
+        total_batch_size, num_timesteps = samples["timesteps"].shape
+        assert (total_batch_size == config.sample.batch_size * config.sample.num_batches_per_epoch)
+        assert num_timesteps == config.sample.inference_steps
 
-                perms = torch.stack([torch.randperm(num_timesteps, device=accelerator.device) for _ in range(total_batch_size)])
-                for key in ["timesteps", "latents", "next_latents", "log_probs"]:
-                    samples[key] = samples[key][torch.arange(total_batch_size, device=accelerator.device)[:, None],perms,]
+        for inner_epoch in range(config.train.num_inner_epochs):
+            perm = torch.randperm(total_batch_size, device=accelerator.device)
+            samples = {k: v[perm] for k, v in samples.items()}
 
-                # rebatch for training
-                samples_batched = {
-                    k: v.reshape(-1, config.train.batch_size, *v.shape[1:]) for k, v in samples.items()
-                }
+            perms = torch.stack([torch.randperm(num_timesteps, device=accelerator.device) for _ in range(total_batch_size)])
+            for key in ["timesteps", "latents", "next_latents", "log_probs"]:
+                samples[key] = samples[key][torch.arange(total_batch_size, device=accelerator.device)[:, None],perms,]
 
-                # dict of lists -> list of dicts for easier iteration
-                samples_batched = [dict(zip(samples_batched, x)) for x in zip(*samples_batched.values())]
+            # rebatch for training
+            samples_batched = {
+                k: v.reshape(-1, config.train.batch_size, *v.shape[1:]) for k, v in samples.items()
+            }
 
-                diffusion.train()
-                info = defaultdict(list)
+            # dict of lists -> list of dicts for easier iteration
+            samples_batched = [dict(zip(samples_batched, x)) for x in zip(*samples_batched.values())]
 
-                for i, sample in tqdm(
-                    list(enumerate(samples_batched)),
-                    desc=f"Epoch {epoch}.{inner_epoch}: training",
-                    position=0,
+            diffusion.train()
+            info = defaultdict(list)
+
+            for i, sample in tqdm(
+                list(enumerate(samples_batched)),
+                desc=f"Epoch {epoch}.{inner_epoch}: training",
+                position=0,
+                disable=not accelerator.is_local_main_process,
+            ):
+                for j in tqdm(
+                    range(inference_steps),
+                    desc="Timestep",
+                    position=1,
+                    leave=False,
                     disable=not accelerator.is_local_main_process,
                 ):
-                     for j in tqdm(
-                        range(inference_steps),
-                        desc="Timestep",
-                        position=1,
-                        leave=False,
-                        disable=not accelerator.is_local_main_process,
-                    ):
-                        with accelerator.accumulate(diffusion):
-                            with autocast():
-                                # TODO: Verify this
-                                noise_pred = diffusion.model(
-                                    sample["latents"][:, j],
-                                    sample["timesteps"][:, j],
-                                ).sample
-
-                                _, log_prob = diffusion.ddim_step_with_logprob(
-                                    noise_pred,
-                                    sample["timesteps"][:, j],
-                                    sample["latents"][:, j],
-                                    eta=config.sample.eta,
-                                    prev_sample=sample["next_latents"][:, j],
-                                )
-                                
-                            # ppo logic
-                            advantages = torch.clamp(
-                                sample["advantages"],
-                                -config.train.adv_clip_max,
-                                config.train.adv_clip_max,
+                    with accelerator.accumulate(diffusion):
+                        with autocast():
+                            # TODO: Verify this
+                            noise_pred = diffusion.model(
+                                sample["latents"][:, j],
+                                sample["timesteps"][:, j],
                             )
-                            ratio = torch.exp(log_prob - sample["log_probs"][:, j])
-                            unclipped_loss = -advantages * ratio
-                            clipped_loss = -advantages * torch.clamp(ratio, 1.0 - config.train.clip_range, 1.0 + config.train.clip_range)
-                            loss = torch.mean(torch.maximum(unclipped_loss, clipped_loss))
 
-                            info["approx_kl"].append(0.5 * torch.mean((log_prob - sample["log_probs"][:, j]) ** 2))
-                            info["clipfrac"].append(torch.mean((torch.abs(ratio - 1.0) > config.train.clip_range).float()))
-                            info["loss"].append(loss)
+                            _, log_prob = diffusion.ddim_step_log_prob(
+                                noise_pred,
+                                sample["timesteps"][:, j],
+                                sample["latents"][:, j],
+                                eta=config.sample.eta,
+                                prev_sample=sample["next_latents"][:, j],
+                            )
+                            
+                        # ppo logic
+                        advantages = torch.clamp(
+                            sample["advantages"],
+                            -config.train.adv_clip_max,
+                            config.train.adv_clip_max,
+                        )
+                        ratio = torch.exp(log_prob - sample["log_probs"][:, j])
+                        unclipped_loss = -advantages * ratio
+                        clipped_loss = -advantages * torch.clamp(ratio, 1.0 - config.train.clip_range, 1.0 + config.train.clip_range)
+                        loss = torch.mean(torch.maximum(unclipped_loss, clipped_loss))
 
-                            accelerator.backward(loss)
-                            if accelerator.sync_gradients:
-                                accelerator.clip_grad_norm_(diffusion.parameters(), config.train.max_grad_norm)
-                            optimizer.step()
-                            optimizer.zero_grad()
+                        info["approx_kl"].append(0.5 * torch.mean((log_prob - sample["log_probs"][:, j]) ** 2))
+                        info["clipfrac"].append(torch.mean((torch.abs(ratio - 1.0) > config.train.clip_range).float()))
+                        info["loss"].append(loss)
 
+                        accelerator.backward(loss)
                         if accelerator.sync_gradients:
-                            assert (j == inference_steps - 1) and (i + 1) % config.train.gradient_accumulation_steps == 0
-                            info = {k: torch.mean(torch.stack(v)) for k, v in info.items()}
-                            info = accelerator.reduce(info, reduction="mean")
-                            info.update({"epoch": epoch, "inner_epoch": inner_epoch})
-                            accelerator.log(info, step=global_step)
-                            global_step += 1
-                            info = defaultdict(list)
+                            accelerator.clip_grad_norm_(diffusion.parameters(), config.train.max_grad_norm)
+                        optimizer.step()
+                        optimizer.zero_grad()
 
-                assert accelerator.sync_gradients
+                    if accelerator.sync_gradients:
+                        assert (j == inference_steps - 1) and (i + 1) % config.train.gradient_accumulation_steps == 0
+                        info = {k: torch.mean(torch.stack(v)) for k, v in info.items()}
+                        info = accelerator.reduce(info, reduction="mean")
+                        info.update({"epoch": epoch, "inner_epoch": inner_epoch})
+                        accelerator.log(info, step=global_step)
+                        global_step += 1
+                        info = defaultdict(list)
 
-            if epoch != 0 and epoch % config.save_freq == 0 and accelerator.is_main_process:
-                accelerator.save_state()
+            assert accelerator.sync_gradients
+
+        if epoch != 0 and epoch % config.save_freq == 0 and accelerator.is_main_process:
+            updated_diffusion = accelerator.unwrap_model(diffusion)
+            updated_diffusion.save_model(config.results_folder)
 
 if __name__ == "__main__":
     main()

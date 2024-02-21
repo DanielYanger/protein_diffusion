@@ -8,7 +8,7 @@ from LGBM.lgbm import LGBM_TE_model
 class Protein:
     def __init__(self, 
                 sequence: str, 
-                models_dir: str = '/work/09360/dayang/ls6/protein-generation/LGBM/LL_P5_P3_CF_AAF_3mer_freq_5',
+                models_dir: str = '/work/09360/dayang/ls6/protein_diffusion/LGBM/LL_P5_P3_CF_AAF_3mer_freq_5',
                 codon_table = CodonTable.standard_dna_table):
 
         

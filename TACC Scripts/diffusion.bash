@@ -1,11 +1,11 @@
 #!/bin/bash
 
-#SBATCH -J 1000-step-diffusion-%j                # job name
-#SBATCH -o 1000-step-diffusion-%j-output.o            # output and error file name (%j expands to SLURM jobID)
+#SBATCH -J lr-prob-diffusion-%j                # job name
+#SBATCH -o lr-prob-diffusion-%j-output.o            # output and error file name (%j expands to SLURM jobID)
 #SBATCH -N 1                        # number of nodes requested
-#SBATCH -n 4                        # total number of tasks to run in parallel
+#SBATCH -n 1                        # total number of tasks to run in parallel
 #SBATCH -p gpu-a100-small              # queue (partition) 
-#SBATCH -t 24:00:00                 # run time (hh:mm:ss) 
+#SBATCH -t 32:00:00                 # run time (hh:mm:ss) 
 #SBATCH --mail-user=daniel_yanger@utexas.edu
 #SBATCH --mail-type=all
 
@@ -14,7 +14,7 @@
 export PATH="$HOME/.local/bin:$PATH"
 source activate base 
 
-cd $WORK/protein-generation/protein_diffusion
+cd $WORK/protein_diffusion
 conda activate ./envs
 # echo $CONDA_DEFAULT_ENV
 # pwd

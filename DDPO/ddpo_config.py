@@ -14,17 +14,15 @@ def get_config():
     # samples.
     config.num_epochs = 100
     # number of epochs between saving model checkpoints.
-    config.save_freq = 20
+    config.save_freq = 10
     # number of checkpoints to keep before overwriting old ones.
     config.num_checkpoint_limit = 5
     # mixed precision training. options are "fp16", "bf16", and "no". half-precision speeds up training significantly.
     config.mixed_precision = "fp16"
     # allow tf32 on Ampere GPUs, which can speed up training.
     config.allow_tf32 = True
-    # resume training from a checkpoint. either an exact checkpoint directory (e.g. checkpoint_50), or a directory
-    # containing checkpoints, in which case the latest one will be used. `config.use_lora` must be set to the same value
-    # as the run that generated the saved checkpoint.
-    config.resume_from = ""
+    
+    config.results_folder = "ddpo_diffusion_model"
 
     config.sequence = "CPEEWEWNRSVMSVHNLCWQQAVDLGLWWILVPMIGGMIYMRQPLHRWLASSFKVFAIYVSIGGQVKRWPVVRFYSMEVWDYLWGYNYYELCIVKCGNYEEKLNIYTDMNRANWPLQFKSWKGGFKGSQYKHAKGTQLRGVSWSRRDTGFCDTMRMRLDWKISWTKHAMIQQRRLFQCSVKFKCFAIGGKEKWWCPMGGKHRGEPLPPKNYCPMVEHYIWFWYFGLFVKRRQDNTRLQKLICLILDNFPCIDNNYDTCYTIEMPDLLCATEQNQCRDMDCYKHPREACIECEGCEPDTWGVSDNTNNKFGICFHRTPQKGLQSTEEIRGDPRGLYKTRGGLMDGWYVNAYFHFTQFHFYDWLEKCCMGIFQEYCMVHEYHANVIIGKVYRQQMCPGYYWKTAMPKFWWHIFNLPSKEITQFIKEVNQYLESQSDTKIKCEAKKGTRRLSFLNCVLLELYCDRDIQMECQRWVRKPWHNQHFSNLRFAGTYSWDQQLRYNTATAAVIKNTASVFTEWCRDLSKTPAMGRFATEAKAGNFKAWKMAHCKRVAPLKKMCQFEFQDVSNWAEFVRDWEFSHREWRAEFVNDLIPDINKLPQSSNTHISNKCYDQNQWTIMIEHAQPMDYMHTGQIKKVMSVGHGMYYPHCISQITWINSFIDTANTKDDHMPSQQRVPSTTSNEHKRYVAMFFSVVYGNTKFNWGNPGHHKPHAPLHTALQNFNTFFFAYTVPGRMHYWWHHVHYLWLPDFWCLCSMKDWCHHSQSKRYGVPLSQYEVDGCQDVWRMQKNMDTQFVLNWLDSGRAQGSACTEINPCPKVKMNSPCQNFHSRMWFRMRKPHLGVEFLIPNDGAKNFFLVDFCIFMMGCCMSRNVKPVMGTPCPHMYLSNHQTVQLIMDQNRFQERAIWYANDRQIDWLHNAVETTAYTYTTWRHEGHLDVLRADVVMWHFSWDVFYYCVQWFQIMNWFHDNGNVHLVSWYLSNAAYKEYSFFVTMQMKAPVQSIS"
 
@@ -36,12 +34,12 @@ def get_config():
     ###### Sampling ######
     config.sample = sample = ml_collections.ConfigDict()
     # number of sampler inference steps.
-    sample.inference_steps = 50
+    sample.inference_steps = 1000
     # eta parameter for the DDIM sampler. this controls the amount of noise injected into the sampling process, with 0.0
     # being fully deterministic and 1.0 being equivalent to the DDPM sampler.
     sample.eta = 1.0
     # batch size (per GPU!) to use for sampling.
-    sample.batch_size = 1
+    sample.batch_size = 16
     # number of batches to sample per epoch. the total number of samples per epoch is `num_batches_per_epoch *
     # batch_size * num_gpus`.
     sample.num_batches_per_epoch = 2
@@ -49,9 +47,9 @@ def get_config():
     ###### Training ######
     config.train = train = ml_collections.ConfigDict()
     # batch size (per GPU!) to use for training.
-    train.batch_size = 1
+    train.batch_size = 16
     # learning rate.
-    train.learning_rate = 3e-4
+    train.learning_rate = 3e-5
     # Adam beta1.
     train.adam_beta1 = 0.9
     # Adam beta2.
@@ -73,8 +71,5 @@ def get_config():
     # the PPO clip range.
     train.clip_range = 1e-4
 
-    ###### Reward Function ######
-    # reward function to use. function pointer to a function that returns a torch 
-    config.reward_fn = ""
 
     return config

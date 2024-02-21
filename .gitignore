@@ -2,6 +2,8 @@ scratch.py
 Test
 __pycache__
 gaussian_diffusion_model*
+ddpo_diffusion_model
+prob_protein_diffusion*
 *-output.o
 envs
 longer_gd

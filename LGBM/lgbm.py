@@ -31,7 +31,7 @@ class LGBM_TE_model:
         full_sequence = self.utr5+cds+self.utr3
         extracted_features = feature_list_from_seq(self.features_to_extract, full_sequence, len(self.utr5), len(cds), len(self.utr3), len(full_sequence))
         value = 0.0
-        for _, model in tqdm(self.models.items()):
+        for _, model in self.models.items():
             value+= model.predict(extracted_features)
         
         value /= len(self.models)
