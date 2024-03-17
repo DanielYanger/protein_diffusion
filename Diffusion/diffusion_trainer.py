@@ -40,8 +40,11 @@ class Trainer1D(object):
         split_batches = True,
         max_grad_norm = 1.,
         save_training_data = False,
+        protein = None,
     ):
         super().__init__()
+
+        self.protein = protein
 
         # accelerator
 
@@ -51,7 +54,6 @@ class Trainer1D(object):
         )
 
         # model
-
         self.model = diffusion_model
         self.channels = diffusion_model.channels
 
@@ -130,6 +132,9 @@ class Trainer1D(object):
         
         samples = self.model.sample()
         torch.save(samples, str(self.results_folder/ f'checkpoints'  / f'samples'  /f'sample-{milestone}.pt'))
+        if(self.protein != None):
+            print(f"Verify {milestone}: {self.protein.multi_check_sequence(samples)}")
+        
 
     def load(self, milestone):
         accelerator = self.accelerator

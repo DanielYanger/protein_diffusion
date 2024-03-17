@@ -7,3 +7,5 @@ prob_protein_diffusion*
 *-output.o
 envs
 longer_gd
+ddim_diffusion
+utr_diffusion

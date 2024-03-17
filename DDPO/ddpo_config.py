@@ -49,7 +49,7 @@ def get_config():
     # batch size (per GPU!) to use for training.
     train.batch_size = 16
     # learning rate.
-    train.learning_rate = 3e-5
+    train.learning_rate = 3e-6
     # Adam beta1.
     train.adam_beta1 = 0.9
     # Adam beta2.
@@ -67,7 +67,7 @@ def get_config():
     # outer epoch's round of sampling.
     train.num_inner_epochs = 1
     # clip advantages to the range [-adv_clip_max, adv_clip_max].
-    train.adv_clip_max = 5
+    train.adv_clip_max = 2.5
     # the PPO clip range.
     train.clip_range = 1e-4
 

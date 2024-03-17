@@ -115,6 +115,7 @@ class Protein_Prob:
         count = []
         sequences = sequences.cpu().numpy()
         for sequence in sequences:
+            print(sequence)
             count.append(self.__single_check_sequence(sequence))
         return t.Tensor(count)
 
