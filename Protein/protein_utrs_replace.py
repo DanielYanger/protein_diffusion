@@ -3,7 +3,7 @@ import random
 import numpy as np
 import torch as t
 
-from LGBM.lgbm_replace import LGBM_TE_model
+from LGBM.lgbm_utr import LGBM_TE_model
 
 class Protein_UTR:
     def __init__(self, 
