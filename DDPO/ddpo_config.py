@@ -49,7 +49,7 @@ def get_config():
     # batch size (per GPU!) to use for training.
     train.batch_size = 16
     # learning rate.
-    train.learning_rate = 5e-6
+    train.learning_rate = 1e-6
     # Adam beta1.
     train.adam_beta1 = 0.9
     # Adam beta2.
