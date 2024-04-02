@@ -28,7 +28,7 @@ class LGBM_TE_model:
         self.utr5 = utr5
 
     def predict_TE(self, seq: str):
-        extracted_features = feature_list_from_seq(self.features_to_extract, full_sequence, self.utr5, len(seq)-self.utr3-self.utr5, self.utr3, len(seq))
+        extracted_features = feature_list_from_seq(self.features_to_extract, seq, self.utr5, len(seq)-self.utr3-self.utr5, self.utr3, len(seq))
         value = 0.0
         for _, model in self.models.items():
             value+= model.predict(extracted_features)

@@ -3,7 +3,7 @@ import random
 import numpy as np
 import torch as t
 
-from LGBM.lgbm_utr import LGBM_TE_model
+from LGBM.lgbm_replace import LGBM_TE_model
 
 class Protein_UTR:
     def __init__(self, 
@@ -24,10 +24,11 @@ class Protein_UTR:
         self.utr5_len = utr5_len
         self.coding_sequence = self.__generate_coding_region()
         self.cds_len = len(self.coding_sequence)
+        self.total_length = utr3_len+utr5_len+self.cds_len
         
 
-        # self.LGBM_model = LGBM_TE_model(models_dir, utr5_len, utr3_len)
-        self.SCALE_FACTOR = 10
+        self.LGBM_model = LGBM_TE_model(models_dir, utr5_len, utr3_len)
+        self.SCALE_FACTOR = 50
 
     def __construct_color_mapping(self, A=1, T=2, C=3, G=4):
         self.base_mapping = {
@@ -57,6 +58,7 @@ class Protein_UTR:
                         self.__inverse_table[amino] = [codon]
         self.__inverse_table['B'] = self.__inverse_table['N'] + self.__inverse_table['D']
         self.__inverse_table['Z'] = self.__inverse_table['Q'] + self.__inverse_table['E']
+        print(self.__inverse_table)
 
     def __generate_coding_region(self):
         seq = ""
@@ -118,4 +120,23 @@ class Protein_UTR:
         return t.Tensor(count)
 
     def reward_TE_prediction(self, sequence):
-        pass
+        count = []
+        # seq = np.clip(sequence.cpu().numpy()*4, 1, 4).round()
+        seq = (sequence.cpu().numpy()*4).round()
+        for sequence in seq:
+            cds = ''
+            for codon in sequence[0]:
+                try:
+                    cds+=self.base_mapping[codon]
+                except KeyError:
+                    break
+            if len(cds) != self.total_length:
+                count.append(-10 * self.SCALE_FACTOR)
+                continue
+
+            # cds[self.utr5_len:self.utr5_len+self.cds_len] = self.coding_sequence
+            # print('utr3 ',cds[0:self.utr5_len])
+            # print('utr5', cds[self.utr5_len+self.cds_len:])
+            count.append(self.LGBM_model.predict_TE(cds[0:self.utr5_len]+self.coding_sequence+cds[self.utr5_len+self.cds_len:])[0] * self.SCALE_FACTOR)
+        
+        return t.Tensor(count)

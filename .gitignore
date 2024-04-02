@@ -8,4 +8,6 @@ prob_protein_diffusion*
 envs
 longer_gd
 ddim_diffusion
-utr_diffusion
+utr_diffusion*
+padded_utr_diffusion*
+DDPO_replace
