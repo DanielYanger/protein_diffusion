@@ -1,5 +1,15 @@
 Application of DDPO in Optimizing DNA sequences for Translational Efficency. 
 
+Try different starting points
+Look at the output
+	Is it all just one sequence or is it actually learning
+	Check diversity
+
+Try with untrained Diffusion Model
+
+Write up what stuff I've worked on so far in the repo
+
+
 **Diffusion**
 - Basic code for a 1 dimensional gaussian diffusion based on the [Lucid Rain implementaion](1)
     - `Diffusion/diffusion_trainer.py`: Class for training a gaussian diffusion model. 
