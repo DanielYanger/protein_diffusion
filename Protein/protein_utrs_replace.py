@@ -2,6 +2,7 @@ from Bio.Data import CodonTable
 import random
 import numpy as np
 import torch as t
+import math
 
 from LGBM.lgbm_utr import LGBM_TE_model
 
@@ -67,6 +68,7 @@ class Protein_UTR:
                seq+=self.__inverse_table[amino_acid][0] 
             except KeyError:
                 print("Amino Acid not in codon table")
+        seq = seq[:-3] + "TAA"
         return seq
 
     def __generate_random_sequence(self):
@@ -134,9 +136,44 @@ class Protein_UTR:
                 count.append(-10 * self.SCALE_FACTOR)
                 continue
 
-            # cds[self.utr5_len:self.utr5_len+self.cds_len] = self.coding_sequence
-            # print('utr3 ',cds[0:self.utr5_len])
-            # print('utr5', cds[self.utr5_len+self.cds_len:])
             count.append(self.LGBM_model.predict_TE(cds[0:self.utr5_len]+self.coding_sequence+cds[self.utr5_len+self.cds_len:])[0] * self.SCALE_FACTOR)
         
         return t.Tensor(count)
+
+    def scaled_reward_TE_prediction(self, sequence):
+        count = []
+        seq = (sequence.cpu().numpy()*4).round()
+        for sequence in seq:
+            cds = ''
+            for codon in sequence[0]:
+                try:
+                    cds+=self.base_mapping[codon]
+                except KeyError:
+                    break
+            if len(cds) != self.total_length:
+                count.append(-10 * self.SCALE_FACTOR)
+                continue
+
+            reward = self.LGBM_model.predict_TE(cds[0:self.utr5_len]+self.coding_sequence+cds[self.utr5_len+self.cds_len:])[0] * self.SCALE_FACTOR
+            base_counts = {base: (cds[0:self.utr5_len].count(base) + cds[self.utr5_len+self.cds_len:].count(base))/(self.utr3_len+self.utr5_len) for base in "ATCG"}
+            base_freqeuncy = 1/2
+            count.append(reward * min(1, math.log(max(base_counts.values()))/math.log(base_freqeuncy)))
+        
+        return t.Tensor(count)
+
+
+    def extract_utr_regions(self, sequence):
+        decoded_utr5s = []
+        decoded_utr3s = []
+        seq = (sequence.cpu().numpy()*4).round()
+        for sequence in seq:
+            cds = ''
+            for codon in sequence[0]:
+                try:
+                    cds+=self.base_mapping[codon]
+                except KeyError:
+                    break
+            decoded_utr5s.append(cds[0:self.utr5_len])
+            decoded_utr3s.append(cds[self.utr5_len+self.cds_len:])
+        
+        return decoded_utr5s, decoded_utr3s

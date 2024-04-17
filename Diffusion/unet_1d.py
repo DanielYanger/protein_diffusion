@@ -155,12 +155,12 @@ class Unet1D(nn.Module):
         x = self.final_res_block(x, t)
         return self.final_conv(x)
 
-    def save_unet(self, file_path):
+    def save_unet(self, file_path, milestone=''):
         checkpoint = {
             'state_dict': self.state_dict(),
             'config': self.config,
         }
-        torch.save(checkpoint, str(f'{file_path}/unet.pt'))
+        torch.save(checkpoint, str(f'{file_path}/unet{milestone}.pt'))
 
     def load_unet(file_path):
         checkpoint = torch.load(str(f'{file_path}/unet.pt'))

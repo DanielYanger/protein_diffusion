@@ -260,7 +260,7 @@ class GaussianDiffusion1D(nn.Module):
         
         # time_cond = torch.full((batch_size,), time, device=device, dtype=torch.long)
         self_cond = None
-        pred_noise, x_start, *_ = self.model_predictions(img, time_next, self_cond, clip_x_start = clip_denoised)
+        pred_noise, x_start, *_ = self.model_predictions(img, time, self_cond, clip_x_start = clip_denoised)
         
         alpha = self.alphas_cumprod[time]
         alpha_next = self.alphas_cumprod[time_next]
@@ -269,8 +269,7 @@ class GaussianDiffusion1D(nn.Module):
         c = (1 - alpha_next - sigma ** 2).sqrt()
         sigma = sigma.view(batch_size, 1, 1)
 
-        noise = torch.randn_like(x_start)
-        img_mean = x_start * alpha_next.view(batch_size, 1, 1).sqrt() + c.view(batch_size, 1, 1) * pred_noise
+        img_mean = x_start * alpha_next.view(batch_size, 1, 1).sqrt() + c.view(batch_size, 1, 1)
         log_prob = (
             -((prev_sample.detach() - img_mean) ** 2) / (2 * (sigma**2)) # type: ignore
             - torch.log(sigma)
@@ -278,8 +277,6 @@ class GaussianDiffusion1D(nn.Module):
         )
 
         return log_prob.mean(dim=tuple(range(1, log_prob.ndim)))
-
-
 
     @torch.no_grad()
     def ddim_sample(self, shape, clip_denoised = True, batch_size = 0, eta=None):
@@ -419,16 +416,16 @@ class GaussianDiffusion1D(nn.Module):
         img = self.normalize(img)
         return self.p_losses(img, t, *args, **kwargs)
     
-    def save_model(self, file_path):
+    def save_model(self, file_path, milestone = ''):
         create_folder(file_path)
-        self.model.save_unet(file_path)
+        self.model.save_unet(file_path, milestone=milestone)
 
         checkpoint = {
             'state_dict': self.state_dict(),
             'config': self.config,
         }
 
-        torch.save(checkpoint, str(f'{file_path}/diffusion-model.pt'))
+        torch.save(checkpoint, str(f'{file_path}/diffusion-model{milestone}.pt'))
 
     def load_diffusion(file_path, device):
 

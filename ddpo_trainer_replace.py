@@ -67,7 +67,7 @@ def main():
     protein_seq = config.sequence
     protein_obj = Protein_UTR(protein_seq, 497, 83)
 
-    reward_fn = protein_obj.reward_TE_prediction
+    reward_fn = protein_obj.scaled_reward_TE_prediction
     autocast = accelerator.autocast
 
     diffusion, optimizer = accelerator.prepare(diffusion, optimizer)
@@ -108,7 +108,6 @@ def main():
                     batch_size=config.sample.batch_size,
                     eta = config.sample.eta
                 )
-            
             latents = torch.stack(latents, dim=1)  # (batch_size, num_steps + 1, 4, 64, 64)
             log_probs = torch.stack(log_probs, dim=1) 
             timesteps = timesteps.repeat(config.sample.batch_size, 1)  # (batch_size, num_steps)
@@ -239,7 +238,8 @@ def main():
 
         if epoch != 0 and epoch % config.save_freq == 0 and accelerator.is_main_process:
             updated_diffusion = accelerator.unwrap_model(diffusion)
-            updated_diffusion.save_model(config.results_folder)
+            updated_diffusion.save_model(config.results_folder, milestone=epoch//config.save_freq)
+            torch.save(images, f"{config.results_folder}/sample-{epoch//config.save_freq}.pt")
 
 if __name__ == "__main__":
     main()

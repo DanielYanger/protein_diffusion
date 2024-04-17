@@ -11,3 +11,5 @@ ddim_diffusion
 utr_diffusion*
 padded_utr_diffusion*
 DDPO_replace
+ddpo-*
+scaled_ddpo
