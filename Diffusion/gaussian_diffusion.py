@@ -101,6 +101,7 @@ class GaussianDiffusion1D(nn.Module):
         alphas = 1. - betas
         alphas_cumprod = torch.cumprod(alphas, dim=0)
         alphas_cumprod_prev = F.pad(alphas_cumprod[:-1], (1, 0), value = 1.)
+        
 
         timesteps, = betas.shape
         self.num_timesteps = int(timesteps)
@@ -269,14 +270,21 @@ class GaussianDiffusion1D(nn.Module):
         c = (1 - alpha_next - sigma ** 2).sqrt()
         sigma = sigma.view(batch_size, 1, 1)
 
-        img_mean = x_start * alpha_next.view(batch_size, 1, 1).sqrt() + c.view(batch_size, 1, 1)
+        img_mean = x_start * alpha_next.view(batch_size, 1, 1).sqrt() + c.view(batch_size, 1, 1) * pred_noise
         log_prob = (
             -((prev_sample.detach() - img_mean) ** 2) / (2 * (sigma**2)) # type: ignore
             - torch.log(sigma)
             - torch.log(torch.sqrt(2 * torch.as_tensor(math.pi)))
         )
 
-        return log_prob.mean(dim=tuple(range(1, log_prob.ndim)))
+        # print(f"Single Step {time}", log_prob, img_mean, sigma, prev_sample, img, time, time_next, alpha, alpha_next, x_start, c, sigma)
+        # print(f"Single Step {time}", f"IMG MEAN: {img_mean}")
+        log_probs = log_prob.mean(dim=tuple(range(1, log_prob.ndim)))
+        nan_mask = torch.isnan(log_probs)
+        log_probs[nan_mask] = 1
+
+        return log_probs
+
 
     @torch.no_grad()
     def ddim_sample(self, shape, clip_denoised = True, batch_size = 0, eta=None):
@@ -306,9 +314,11 @@ class GaussianDiffusion1D(nn.Module):
 
             if time_next < 0:
                 img = x_start
+                all_latents.append(img)
+                log_probs.append(torch.full((batch,), 1, device=device, dtype=torch.long))
+                times.append(time)
                 continue
-            
-            times.append(time)
+            times.append(time)            
 
             alpha = self.alphas_cumprod[time]
             alpha_next = self.alphas_cumprod[time_next]
@@ -327,9 +337,10 @@ class GaussianDiffusion1D(nn.Module):
                 - torch.log(sigma)
                 - torch.log(torch.sqrt(2 * torch.as_tensor(math.pi)))
             )
+            # print(f"Full Sample {time}", log_prob, img_mean, sigma, img, time, time_next, alpha, alpha_next, x_start, c, sigma)
+            # print(f"Full Sample {time}", f"IMG MEAN: {img_mean}")
 
             log_probs.append(log_prob.mean(dim=tuple(range(1, log_prob.ndim))))
-
 
         img = self.unnormalize(img)
         return img, all_latents, log_probs, torch.tensor(times, device = device)

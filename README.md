@@ -1,5 +1,29 @@
 ## Application of DDPO in Optimizing DNA sequences for Translational Efficency. 
 
+### Training Models
+- Install the dependencies from `requirements.txt`
+- Diffusion
+    + `train_diffusion_utrs.py` and `train_diffusion.py` are the files to run
+    + Run the command `accelerate launch file` to start the training process. Hyperparameters can be tuned in the file
+    + The type of diffusion model (only coding region, full sequence, fixed coding region, etc.) is dictated by the `Protein` class.
+    + `TACC Scripts/diffusion.bash` has an example script that can be used with the TACC LS6 machines. 
+- DDPO
+    + `ddpo_trainer_replace.py` and `ddpo_trainer.py` are the scripts to run
+    + Run the command `accelerate launch file` to start the training process. 
+    + Hyperparameters are tunable in `DDPO/ddpo_config.py`. If you need multiple profiles, copy the file and change the file referenced in the training scripts. 
+        - Most important hyper parameters are:
+            - `config.num_epochs`: Number of epochs to train on
+            - `config.results_folder`: Location to save the model and samples to
+            - `config.sequence`: Protein sequence used
+            - `pretrained.model`: Folder containing the pretrained diffusion model. Note, it doesn't have to be well trained but it should be somewhat trained for some reason. More investigation needs to go into this.
+            - `sample.batch_size`: Sequences to generate per batch
+            - `sample.num_batches_per_epoch`: Number of batches to generate per epoch. Total effective size is # GPUs * batch_size * num_batches_per_epoch.
+            - `train.batch_size`: Batch size to use for training. Needs to evenly divide total effective size
+            - `train.learning_rate`: Learning rate
+            - `train.adv_clip_max`: Maximum allowed advantage, which is the standardized reward. Basically prevents a single sample from driving the model's direction
+            - `train.clip_range`: Maximum deviation from the original log ratio. Used in the PPO logic. 
+
+
 ### Things I've Tried
 - Building a diffusion model to generate the coding region
     + Diffusion model has 3 channels, each one representing a codon. Randomly generate a bunch of DNA sequences as the training set and have the diffusion model learn how to generate correct sequences.
@@ -47,19 +71,31 @@
     + Ran into issues with generating negative values and breaking
     + Softmax/argmax method might allow for this and handle negative numbers
 
-### Things to Do
+- Debugging DDPO
+    + Spent a lot of time comparing things to fully understand what was going wrong
+    + Miscomputation of the log prob resulted in incorrect training values. Essentially, the log probs should be equal during the first training epoch but then once it's been trained, they start to differ a bit. This should be somewhat reflected in the kl divergence and clip ratio.
+
+- DDPO Rewards
+    + Finetuning the reward is very important. For example, the model initially converged to the UTRs being all T. However, once I changed the reward to penalize not being diverse enough (over 50% of a single base), it started to produce UTR5 regions that were diverse and UTR3 regions that contained long strings of just T's but still having some diversity. 
+    + Penalizing certain behavior is completely possible to encourage or discourage certain patterns.
+
+### Long Term Objectives
 - Retry the probability distribution
     + Use a softmax or don't use it for training, just directly use it in DDPO
+    + Potentially with the right hyperparameters you can train the model to produce the entire sequence (coding regions + utrs) without needing to replace with a fixed value. The hyperparameter that seemed to do the most was the dimensions. You can have a list of length no greater than the number of factors of 2 plus one in the length of the sequence. So for example, if the length is 3780 ($2^2*3^3*5*7$), you can only have 3 additional dimensions. Tuning these seem to change the most as I got a model to learn the first part of the sequence. 
 
-- When DDPO is working
-    + Check the diversity of the generated sequences
-        * Make sure it isn't all just Ts
+- DDPO Related Improvements
     + Try starting from different points to see if it results in different outputs
+        + Change the seed in the config file
     + Finetune hyperparameters
-    + Try on a known/different protein
-    + Try on a shorter protein
+        + Increase Batch Size, tune learning rate, clip range, max advantage
+    + Try on a known protein
+        + See if we can get an actual improvement
+    + Understand why it breaks with untrained model
+        + Might already be fixed but untested
 
-- Try DPOK
+- DPOK
+    + Implement to see if there are any differences
 
 ### Code
 **Diffusion**

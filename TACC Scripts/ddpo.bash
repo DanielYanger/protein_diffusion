@@ -4,8 +4,8 @@
 #SBATCH -o ddpo-%j-output.o            # output and error file name (%j expands to SLURM jobID)
 #SBATCH -N 1                        # number of nodes requested
 #SBATCH -n 1                     # total number of tasks to run in parallel
-#SBATCH -p gpu-a100-dev              # queue (partition) 
-#SBATCH -t 2:00:00                 # run time (hh:mm:ss) 
+#SBATCH -p gpu-a100-small              # queue (partition) 
+#SBATCH -t 36:00:00                 # run time (hh:mm:ss) 
 #SBATCH --mail-user=daniel_yanger@utexas.edu
 #SBATCH --mail-type=all
 

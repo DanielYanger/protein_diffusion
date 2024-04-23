@@ -133,7 +133,7 @@ class Protein_UTR:
                 except KeyError:
                     break
             if len(cds) != self.total_length:
-                count.append(-10 * self.SCALE_FACTOR)
+                count.append(-5)
                 continue
 
             count.append(self.LGBM_model.predict_TE(cds[0:self.utr5_len]+self.coding_sequence+cds[self.utr5_len+self.cds_len:])[0] * self.SCALE_FACTOR)
@@ -151,7 +151,7 @@ class Protein_UTR:
                 except KeyError:
                     break
             if len(cds) != self.total_length:
-                count.append(-10 * self.SCALE_FACTOR)
+                count.append(-5)
                 continue
 
             reward = self.LGBM_model.predict_TE(cds[0:self.utr5_len]+self.coding_sequence+cds[self.utr5_len+self.cds_len:])[0] * self.SCALE_FACTOR

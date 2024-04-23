@@ -209,7 +209,11 @@ def main():
                             -config.train.adv_clip_max,
                             config.train.adv_clip_max,
                         )
+
                         ratio = torch.exp(log_prob - sample["log_probs"][:, j])
+                        # print(f"Ratio: {ratio}")
+                        temp = sample["log_probs"][:, j]
+                        # print(f"Log_prob Single Step: {log_prob}, Log Prob Full Step: {temp}")
                         unclipped_loss = -advantages * ratio
                         clipped_loss = -advantages * torch.clamp(ratio, 1.0 - config.train.clip_range, 1.0 + config.train.clip_range)
                         loss = torch.mean(torch.maximum(unclipped_loss, clipped_loss))
